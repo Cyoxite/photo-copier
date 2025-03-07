@@ -9,10 +9,8 @@ destination_root = "C:/photos"
 is_running = False
 copied_files = set()
 copied_count = 0
-copied_files_path = "copied_files.txt"
 
 def get_file_hash(file_path):
-    """Calc hash of file"""
     hasher = hashlib.md5()
     with open(file_path, 'rb') as f:
         while chunk := f.read(4096):
@@ -22,17 +20,16 @@ def get_file_hash(file_path):
 def load_copied_files():
     global copied_files
     copied_files.clear()
-    if os.path.exists(copied_files_path):
-        with open(copied_files_path, "r") as f:
-            copied_files = set(f.read().splitlines())
-
-def save_copied_file(file_hash):
-    with open(copied_files_path, "a") as f:
-        f.write(file_hash + "\n")
+    for folder_number in range(1, 10000):
+        folder_path = os.path.join(destination_root, str(folder_number))
+        if not os.path.exists(folder_path):
+            break
+        for file in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file)
+            if os.path.isfile(file_path):
+                copied_files.add(get_file_hash(file_path))
 
 def reset_copied_files():
-    if os.path.exists(copied_files_path):
-        os.remove(copied_files_path)
     copied_files.clear()
 
 def get_next_folder():
@@ -73,7 +70,6 @@ def copy_images(source_folder, status_label, log_output):
                 
                 shutil.copy2(file_path, destination_path)
                 copied_files.add(file_hash)
-                save_copied_file(file_hash)
                 copied_count += 1
                 status_label.config(text=f"Skopiowano: {copied_count} zdjęć")
                 log_output.insert(tk.END, f"Skopiowano: {file} -> {destination_path}\n")
@@ -108,7 +104,7 @@ def stop_copying(status_label, log_output):
 
 def create_gui():
     root = tk.Tk()
-    root.title("Photo Organizer")
+    root.title("Photo Copier")
     root.geometry("400x300")
     
     status_label = tk.Label(root, text="", fg="blue")
