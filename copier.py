@@ -29,9 +29,6 @@ def load_copied_files():
             if os.path.isfile(file_path):
                 copied_files.add(get_file_hash(file_path))
 
-def reset_copied_files():
-    copied_files.clear()
-
 def get_next_folder():
     folder_number = 1
     while True:
@@ -61,7 +58,7 @@ def copy_images(source_folder, status_label, log_output):
                 file_hash = get_file_hash(file_path)
                 
                 if file_hash in copied_files:
-                    log_output.insert(tk.END, f"Pominięto: {file}\n")
+                    log_output.insert(tk.END, f"Plik: {file} już jest skopiowany.\n")
                     log_output.yview(tk.END)
                     continue  
                 
@@ -102,10 +99,17 @@ def stop_copying(status_label, log_output):
     log_output.insert(tk.END, "Zatrzymano kopiowanie.\n")
     log_output.yview(tk.END)
 
+def select_output_folder(output_label):
+    global destination_root
+    folder_selected = filedialog.askdirectory()
+    if folder_selected:
+        destination_root = folder_selected
+        output_label.config(text=f"Folder docelowy: {destination_root}")
+
 def create_gui():
     root = tk.Tk()
     root.title("Photo Copier")
-    root.geometry("400x300")
+    root.geometry("600x400")
     
     status_label = tk.Label(root, text="", fg="blue")
     status_label.pack(pady=5)
@@ -116,10 +120,13 @@ def create_gui():
     stop_button = tk.Button(root, text="Stop", command=lambda: stop_copying(status_label, log_output), width=20)
     stop_button.pack(pady=5)
     
-    reset_button = tk.Button(root, text="Reset Kopiowania", command=reset_copied_files, width=20)
-    reset_button.pack(pady=5)
+    output_label = tk.Label(root, text=f"Kopiowanie do folderu: {destination_root}", fg="black")
+    output_label.pack(pady=5)
     
-    log_output = scrolledtext.ScrolledText(root, width=50, height=10, bg="white", fg="black")
+    select_output_button = tk.Button(root, text="Zmień folder docelowy", command=lambda: select_output_folder(output_label), width=20)
+    select_output_button.pack(pady=5)
+    
+    log_output = scrolledtext.ScrolledText(root, width=70, height=12, bg="white", fg="black")
     log_output.pack(pady=5)
     
     root.mainloop()
