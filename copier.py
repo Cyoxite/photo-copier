@@ -3,15 +3,16 @@ import shutil
 import hashlib
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, scrolledtext
 
 destination_root = "C:/photos"
 is_running = False
 copied_files = set()
 copied_count = 0
+copied_files_path = "copied_files.txt"
 
 def get_file_hash(file_path):
-    """Oblicza skrót pliku, aby uniknąć duplikatów."""
+    """Calc hash of file"""
     hasher = hashlib.md5()
     with open(file_path, 'rb') as f:
         while chunk := f.read(4096):
@@ -19,19 +20,22 @@ def get_file_hash(file_path):
     return hasher.hexdigest()
 
 def load_copied_files():
-    """Wczytuje listę już skopiowanych plików."""
     global copied_files
-    if os.path.exists("copied_files.txt"):
-        with open("copied_files.txt", "r") as f:
+    copied_files.clear()
+    if os.path.exists(copied_files_path):
+        with open(copied_files_path, "r") as f:
             copied_files = set(f.read().splitlines())
 
 def save_copied_file(file_hash):
-    """Zapisuje informację o skopiowanym pliku."""
-    with open("copied_files.txt", "a") as f:
+    with open(copied_files_path, "a") as f:
         f.write(file_hash + "\n")
 
+def reset_copied_files():
+    if os.path.exists(copied_files_path):
+        os.remove(copied_files_path)
+    copied_files.clear()
+
 def get_next_folder():
-    """Znajduje lub tworzy kolejny folder do przechowywania zdjęć."""
     folder_number = 1
     while True:
         folder_path = os.path.join(destination_root, str(folder_number))
@@ -42,8 +46,7 @@ def get_next_folder():
             return folder_path
         folder_number += 1
 
-def copy_images(source_folder, status_label):
-    """Funkcja kopiująca obrazy do katalogów w tle."""
+def copy_images(source_folder, status_label, log_output):
     global is_running, copied_count
     load_copied_files()
     copied_count = 0
@@ -61,7 +64,9 @@ def copy_images(source_folder, status_label):
                 file_hash = get_file_hash(file_path)
                 
                 if file_hash in copied_files:
-                    continue  # Plik już został skopiowany
+                    log_output.insert(tk.END, f"Pominięto: {file}\n")
+                    log_output.yview(tk.END)
+                    continue  
                 
                 destination_folder = get_next_folder()
                 destination_path = os.path.join(destination_folder, file)
@@ -71,12 +76,15 @@ def copy_images(source_folder, status_label):
                 save_copied_file(file_hash)
                 copied_count += 1
                 status_label.config(text=f"Skopiowano: {copied_count} zdjęć")
+                log_output.insert(tk.END, f"Skopiowano: {file} -> {destination_path}\n")
+                log_output.yview(tk.END)
     
     is_running = False
     status_label.config(text="Zakończono kopiowanie")
+    log_output.insert(tk.END, "Zakończono kopiowanie.\n")
+    log_output.yview(tk.END)
 
-def start_copying(status_label):
-    """Rozpoczyna kopiowanie w osobnym wątku."""
+def start_copying(status_label, log_output):
     global is_running
     if is_running:
         return
@@ -87,28 +95,36 @@ def start_copying(status_label):
     
     is_running = True
     status_label.config(text="Rozpoczęto kopiowanie...")
-    threading.Thread(target=copy_images, args=(source_folder, status_label), daemon=True).start()
+    log_output.insert(tk.END, "Rozpoczęto kopiowanie...\n")
+    log_output.yview(tk.END)
+    threading.Thread(target=copy_images, args=(source_folder, status_label, log_output), daemon=True).start()
 
-def stop_copying(status_label):
-    """Zatrzymuje proces kopiowania."""
+def stop_copying(status_label, log_output):
     global is_running
     is_running = False
     status_label.config(text="Zatrzymano kopiowanie")
+    log_output.insert(tk.END, "Zatrzymano kopiowanie.\n")
+    log_output.yview(tk.END)
 
 def create_gui():
-    """Tworzy GUI aplikacji."""
     root = tk.Tk()
     root.title("Photo Organizer")
-    root.geometry("300x200")
+    root.geometry("400x300")
     
     status_label = tk.Label(root, text="", fg="blue")
-    status_label.pack(pady=10)
+    status_label.pack(pady=5)
     
-    start_button = tk.Button(root, text="Start", command=lambda: start_copying(status_label), width=20)
-    start_button.pack(pady=10)
+    start_button = tk.Button(root, text="Start", command=lambda: start_copying(status_label, log_output), width=20)
+    start_button.pack(pady=5)
     
-    stop_button = tk.Button(root, text="Stop", command=lambda: stop_copying(status_label), width=20)
-    stop_button.pack(pady=10)
+    stop_button = tk.Button(root, text="Stop", command=lambda: stop_copying(status_label, log_output), width=20)
+    stop_button.pack(pady=5)
+    
+    reset_button = tk.Button(root, text="Reset Kopiowania", command=reset_copied_files, width=20)
+    reset_button.pack(pady=5)
+    
+    log_output = scrolledtext.ScrolledText(root, width=50, height=10, bg="white", fg="black")
+    log_output.pack(pady=5)
     
     root.mainloop()
 
