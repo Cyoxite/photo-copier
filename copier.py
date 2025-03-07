@@ -20,27 +20,35 @@ def get_file_hash(file_path):
 def load_copied_files():
     global copied_files
     copied_files.clear()
-    for folder_number in range(1, 10000):
-        folder_path = os.path.join(destination_root, str(folder_number))
-        if not os.path.exists(folder_path):
-            break
+    existing_folders = sorted(
+        [f for f in os.listdir(destination_root) if f.isdigit()],
+        key=lambda x: int(x)
+    )
+    
+    for folder_name in existing_folders:
+        folder_path = os.path.join(destination_root, folder_name)
         for file in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file)
             if os.path.isfile(file_path):
                 copied_files.add(get_file_hash(file_path))
 
 def get_next_folder():
-    folder_number = 1
-    while True:
-        folder_path = os.path.join(destination_root, str(folder_number))
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-            return folder_path
+    existing_folders = sorted(
+        [f for f in os.listdir(destination_root) if f.isdigit()],
+        key=lambda x: int(x)
+    )
+    
+    for folder_name in existing_folders:
+        folder_path = os.path.join(destination_root, folder_name)
         if len(os.listdir(folder_path)) < 500:
             return folder_path
-        folder_number += 1
 
-def copy_images(source_folder, status_label, log_output):
+    new_folder_number = 1 if not existing_folders else int(existing_folders[-1]) + 1
+    new_folder_path = os.path.join(destination_root, str(new_folder_number))
+    os.makedirs(new_folder_path)
+    return new_folder_path
+
+def copy_images(source_folder, status_label, log_output, start_button):
     global is_running, copied_count
     load_copied_files()
     copied_count = 0
@@ -69,15 +77,16 @@ def copy_images(source_folder, status_label, log_output):
                 copied_files.add(file_hash)
                 copied_count += 1
                 status_label.config(text=f"Skopiowano: {copied_count} zdjęć")
-                log_output.insert(tk.END, f"Skopiowano: {file} -> {destination_path}\n")
+                log_output.insert(tk.END, f"Skopiowano: {destination_path}\n")
                 log_output.yview(tk.END)
     
     is_running = False
-    status_label.config(text="Zakończono kopiowanie")
+    status_label.config(text=f"Zakończono kopiowanie. Skopiowano: {copied_count} zdjęć")
     log_output.insert(tk.END, "Zakończono kopiowanie.\n")
     log_output.yview(tk.END)
+    start_button.config(state=tk.NORMAL)
 
-def start_copying(status_label, log_output):
+def start_copying(status_label, log_output, start_button):
     global is_running
     if is_running:
         return
@@ -88,16 +97,18 @@ def start_copying(status_label, log_output):
     
     is_running = True
     status_label.config(text="Rozpoczęto kopiowanie...")
-    log_output.insert(tk.END, "Rozpoczęto kopiowanie...\n")
+    log_output.insert(tk.END, "Rozpoczęto kopiowanie i przeliczanie duplikatów...\n")
     log_output.yview(tk.END)
-    threading.Thread(target=copy_images, args=(source_folder, status_label, log_output), daemon=True).start()
+    start_button.config(state=tk.DISABLED)
+    threading.Thread(target=copy_images, args=(source_folder, status_label, log_output, start_button), daemon=True).start()
 
-def stop_copying(status_label, log_output):
+def stop_copying(status_label, log_output, start_button):
     global is_running
     is_running = False
     status_label.config(text="Zatrzymano kopiowanie")
     log_output.insert(tk.END, "Zatrzymano kopiowanie.\n")
     log_output.yview(tk.END)
+    start_button.config(state=tk.NORMAL)
 
 def select_output_folder(output_label):
     global destination_root
@@ -114,10 +125,10 @@ def create_gui():
     status_label = tk.Label(root, text="", fg="blue")
     status_label.pack(pady=5)
     
-    start_button = tk.Button(root, text="Start", command=lambda: start_copying(status_label, log_output), width=20)
+    start_button = tk.Button(root, text="Start", command=lambda: start_copying(status_label, log_output, start_button), width=20)
     start_button.pack(pady=5)
     
-    stop_button = tk.Button(root, text="Stop", command=lambda: stop_copying(status_label, log_output), width=20)
+    stop_button = tk.Button(root, text="Stop", command=lambda: stop_copying(status_label, log_output, start_button), width=20)
     stop_button.pack(pady=5)
     
     output_label = tk.Label(root, text=f"Kopiowanie do folderu: {destination_root}", fg="black")
